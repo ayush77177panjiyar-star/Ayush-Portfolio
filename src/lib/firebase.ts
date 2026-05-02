@@ -13,12 +13,15 @@ import {
   getFirestore, 
   collection, 
   addDoc, 
+  updateDoc,
+  deleteDoc,
   query, 
   orderBy, 
   getDocs,
   serverTimestamp,
   doc,
-  getDocFromServer
+  getDocFromServer,
+  setDoc
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -108,5 +111,42 @@ export async function getLogins() {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, path);
+  }
+}
+
+export async function getProjects() {
+  const path = 'projects';
+  try {
+    const q = query(collection(db, path), orderBy('updatedAt', 'desc'));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+  }
+}
+
+export async function updateProject(id: string, data: any) {
+  const path = `projects/${id}`;
+  try {
+    await updateDoc(doc(db, 'projects', id), {
+      ...data,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function addProject(data: any) {
+  const path = 'projects';
+  try {
+    const docRef = await addDoc(collection(db, path), {
+      ...data,
+      updatedAt: serverTimestamp()
+    });
+    return docRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
   }
 }

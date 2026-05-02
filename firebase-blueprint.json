@@ -13,12 +13,31 @@
         "userAgent": { "type": "string", "description": "Browser user agent." }
       },
       "required": ["userId", "method", "timestamp"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Portfolio project details.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Project title." },
+        "description": { "type": "string", "description": "Long form description." },
+        "shortDescription": { "type": "string", "description": "Brief summary for card view." },
+        "tags": { "type": "array", "items": { "type": "string" }, "description": "Tech stack tags." },
+        "github": { "type": "string", "description": "GitHub URL." },
+        "demo": { "type": "string", "description": "Live demo URL." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp." }
+      },
+      "required": ["title", "description", "tags"]
     }
   },
   "firestore": {
     "logins": {
       "schema": "Login",
       "description": "Collection of all login events."
+    },
+    "projects": {
+      "schema": "Project",
+      "description": "Collection of portfolio projects."
     }
   }
 }

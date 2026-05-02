@@ -41,6 +41,19 @@ service cloud.firestore {
         && data.keys().size() >= 3 && data.keys().size() <= 6;
     }
 
+    // Project Entity Validation
+    function isValidProject(data) {
+      return data.title is string && data.title.size() <= 128
+        && data.description is string && data.description.size() <= 5000
+        && (data.shortDescription == null || (data.shortDescription is string && data.shortDescription.size() <= 500))
+        && data.tags is list && data.tags.size() <= 20
+        && (data.github == null || (data.github is string && data.github.size() <= 512))
+        && (data.demo == null || (data.demo is string && data.demo.size() <= 512))
+        && (data.updatedAt == null || data.updatedAt == request.time)
+        && data.keys().hasAll(['title', 'description', 'tags'])
+        && data.keys().size() >= 3 && data.keys().size() <= 7;
+    }
+
     // 1. Logins Collection
     match /logins/{loginId} {
       // Only admins can see the login history
@@ -53,6 +66,16 @@ service cloud.firestore {
 
       // Logins are immutable once created
       allow update, delete: if false;
+    }
+
+    // 2. Projects Collection
+    match /projects/{projectId} {
+      // Anyone can read projects
+      allow read, list: if true;
+
+      // Only admins can modify projects
+      allow create, update: if isAdmin() && isValidProject(incoming());
+      allow delete: if isAdmin();
     }
   }
 }

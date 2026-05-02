@@ -26,13 +26,19 @@ import {
   Shield,
   X,
   Smartphone,
-  ChevronLeft
+  ChevronLeft,
+  Edit2,
+  Save,
+  Plus
 } from 'lucide-react';
 import { 
   auth, 
   googleProvider, 
   logUserLogin, 
-  getLogins 
+  getLogins,
+  getProjects,
+  updateProject,
+  addProject
 } from './lib/firebase';
 import { 
   signInWithPopup, 
@@ -48,12 +54,14 @@ const PERSONAL_EMAIL = 'ayush77177panjiyar@gmail.com';
 
 // Types
 interface Project {
-  id: number;
+  id: string; // Changed to string for Firestore ID
   title: string;
   description: string;
+  shortDescription?: string;
   tags: string[];
   github: string;
   demo: string;
+  updatedAt?: any;
 }
 
 interface Skill {
@@ -70,57 +78,6 @@ interface LoginRecord {
   timestamp: any;
   userAgent?: string;
 }
-
-const PROJECTS: Project[] = [
-  {
-    id: 1,
-    title: "E-Commerce Dashboard",
-    description: "Developed a comprehensive admin panel for inventory tracking and sales analytics during internship at Saiket Systems.",
-    tags: ["React", "Tailwind", "JavaScript"],
-    github: "#",
-    demo: "#"
-  },
-  {
-    id: 2,
-    title: "Task Orchestrator",
-    description: "A sleek project management tool with drag-and-drop features and priority leveling for developer workflows.",
-    tags: ["HTML", "CSS", "JS"],
-    github: "#",
-    demo: "#"
-  },
-  {
-    id: 3,
-    title: "Weather Intelligence",
-    description: "Real-time weather tracking app using OpenWeather API with detailed forecasting and dynamic backgrounds.",
-    tags: ["API Integration", "CSS3", "JavaScript"],
-    github: "#",
-    demo: "#"
-  },
-  {
-    id: 4,
-    title: "Saiket Systems Website",
-    description: "Collaborated on the official company landing page, focusing on performance optimization and SEO structural elements.",
-    tags: ["Frontend", "Performance", "HTML"],
-    github: "#",
-    demo: "#"
-  },
-  {
-    id: 5,
-    title: "Nexus Chat App",
-    description: "A minimalist messaging interface built with a focus on UI responsiveness and subtle micro-interactions.",
-    tags: ["CSS Grid", "Animations", "JS"],
-    github: "#",
-    demo: "#"
-  },
-  {
-    id: 6,
-    title: "Asset Manager Pro",
-    description: "Internal inventory management system designed to streamline warehouse operations and equipment logging.",
-    tags: ["Systems", "Architecture", "JavaScript"],
-    github: "#",
-    demo: "#"
-  }
-];
 
 const SKILLS: Skill[] = [
   { name: "C", category: "Language" },
@@ -140,6 +97,18 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isAdminView, setIsAdminView] = useState(false);
   const [logins, setLogins] = useState<LoginRecord[]>([]);
+  const [dbProjects, setDbProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Edit form state
+  const [editTitle, setEditTitle] = useState("");
+  const [editShortDesc, setEditShortDesc] = useState("");
+  const [editLongDesc, setEditLongDesc] = useState("");
+  const [editTags, setEditTags] = useState("");
+  const [editGithub, setEditGithub] = useState("");
+  const [editDemo, setEditDemo] = useState("");
 
   // Phone Auth States
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -170,19 +139,126 @@ export default function App() {
     }
   };
 
-  // Auth Listener
+  // Auth Listener and Initial Data Fetch
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (currentUser?.email === PERSONAL_EMAIL) {
-        // Automatically fetch logins if admin
         fetchLogins();
       } else {
         setIsAdminView(false);
       }
     });
+
+    fetchProjects();
     return () => unsubscribe();
   }, []);
+
+  const fetchProjects = async () => {
+    setLoading(true);
+    const data = await getProjects();
+    if (data) {
+      setDbProjects(data as Project[]);
+    } else {
+      // Seed if empty
+      await seedDatabase();
+    }
+    setLoading(false);
+  };
+
+  const seedDatabase = async () => {
+    const initialProjects = [
+      {
+        title: "E-Commerce Dashboard",
+        shortDescription: "Personalized admin panel for sales and inventory tracking.",
+        description: "Developed a comprehensive admin panel for inventory tracking and sales analytics during internship at Saiket Systems. Includes real-time analytics, inventory management, and customer behavior tracking. Performance matched for 2026 standards with sub-100ms interaction latency.",
+        tags: ["React", "Tailwind", "Firebase"],
+        github: "#",
+        demo: "#"
+      },
+      {
+        title: "Task Orchestrator",
+        shortDescription: "Sleek project management for minimalist developers.",
+        description: "A sleek project management tool with drag-and-drop features and priority leveling for developer workflows. Focus-driven task management app that prioritizes deep work.",
+        tags: ["HTML", "CSS", "JS"],
+        github: "#",
+        demo: "#"
+      },
+      {
+        title: "Weather Intelligence",
+        shortDescription: "Real-time weather tracking with deep insights.",
+        description: "Real-time weather tracking app using OpenWeather API with detailed forecasting and dynamic backgrounds. Features predictive modeling for local climate shifts.",
+        tags: ["API Integration", "CSS3", "JavaScript"],
+        github: "#",
+        demo: "#"
+      },
+      {
+        title: "Saiket Systems Website",
+        shortDescription: "Official corporate site with ultra-fast load times.",
+        description: "Collaborated on the official company landing page, focusing on performance optimization and SEO structural elements. Leveraged modern SSR techniques for instant hydration.",
+        tags: ["Frontend", "Performance", "HTML"],
+        github: "#",
+        demo: "#"
+      },
+      {
+        title: "Nexus Chat App",
+        shortDescription: "Low-latency messaging with minimalist UI.",
+        description: "A minimalist messaging interface built with a focus on UI responsiveness and subtle micro-interactions. Real-time state management using modern protocols.",
+        tags: ["CSS Grid", "Animations", "JS"],
+        github: "#",
+        demo: "#"
+      },
+      {
+        title: "Asset Manager Pro",
+        shortDescription: "Enterprise-grade inventory management.",
+        description: "Internal inventory management system designed to streamline warehouse operations and equipment logging. Features QR code scanning and automated auditing.",
+        tags: ["Systems", "Architecture", "JavaScript"],
+        github: "#",
+        demo: "#"
+      }
+    ];
+
+    for (const p of initialProjects) {
+      await addProject(p);
+    }
+    const freshData = await getProjects();
+    if (freshData) setDbProjects(freshData as Project[]);
+  };
+
+  const startEditing = (project: Project) => {
+    setSelectedProject(project);
+    setEditTitle(project.title);
+    setEditShortDesc(project.shortDescription || "");
+    setEditLongDesc(project.description);
+    setEditTags(project.tags.join(", "));
+    setEditGithub(project.github);
+    setEditDemo(project.demo);
+    setIsEditing(true);
+  };
+
+  const saveProject = async () => {
+    if (!selectedProject) return;
+    const updatedData = {
+      title: editTitle,
+      shortDescription: editShortDesc,
+      description: editLongDesc,
+      tags: editTags.split(",").map(t => t.trim()),
+      github: editGithub,
+      demo: editDemo
+    };
+
+    if (selectedProject.id) {
+      await updateProject(selectedProject.id, updatedData);
+    } else {
+      const newId = await addProject(updatedData);
+      selectedProject.id = newId!;
+    }
+    
+    setIsEditing(false);
+    fetchProjects();
+    // Update local selected project too
+    setSelectedProject({ ...selectedProject, ...updatedData });
+  };
 
   const fetchLogins = async () => {
     const data = await getLogins();
@@ -245,11 +321,11 @@ export default function App() {
   };
 
   const filteredProjects = useMemo(() => {
-    return PROJECTS.filter(project => 
+    return dbProjects.filter(project => 
       project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       project.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
     );
-  }, [searchQuery]);
+  }, [searchQuery, dbProjects]);
 
   const filteredSkills = useMemo(() => {
     return SKILLS.filter(skill => 
@@ -639,8 +715,36 @@ export default function App() {
             <h2 className="text-3xl font-bold tracking-tight mb-2">Featured Projects</h2>
             <p className="text-gray-500 text-sm">A collection of technical solutions and creative builds.</p>
           </div>
-          <div className="text-sm text-gray-500 font-mono">
-            {filteredProjects.length} / {PROJECTS.length} results
+          <div className="flex items-center gap-6">
+            {user?.email === PERSONAL_EMAIL && (
+              <button 
+                onClick={() => {
+                  const newProj: Project = {
+                    id: "",
+                    title: "New Project",
+                    description: "Details about your new initiative...",
+                    shortDescription: "A brief summary...",
+                    tags: ["React"],
+                    github: "#",
+                    demo: "#"
+                  };
+                  setSelectedProject(newProj);
+                  setEditTitle(newProj.title);
+                  setEditShortDesc(newProj.shortDescription || "");
+                  setEditLongDesc(newProj.description);
+                  setEditTags(newProj.tags.join(", "));
+                  setEditGithub(newProj.github);
+                  setEditDemo(newProj.demo);
+                  setIsEditing(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-full glass glass-hover text-emerald-400 text-xs font-bold uppercase tracking-widest"
+              >
+                <Plus size={14} /> Add Project
+              </button>
+            )}
+            <div className="text-sm text-gray-500 font-mono hidden sm:block">
+              {filteredProjects.length} / {dbProjects.length} results
+            </div>
           </div>
         </div>
 
@@ -654,7 +758,8 @@ export default function App() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.3 }}
-                className="glass glass-hover p-6 rounded-[24px] flex flex-col justify-between group h-full"
+                onClick={() => setSelectedProject(project)}
+                className="glass glass-hover p-6 rounded-[24px] flex flex-col justify-between group h-full cursor-pointer"
               >
                 <div>
                   <div className="flex items-center justify-between mb-4">
@@ -663,8 +768,8 @@ export default function App() {
                     </div>
                   </div>
                   <h3 className="text-xl font-semibold mb-3 group-hover:text-blue-400 transition-colors">{project.title}</h3>
-                  <p className="text-gray-400 text-sm leading-relaxed mb-6">
-                    {project.description}
+                  <p className="text-gray-400 text-sm leading-relaxed mb-6 line-clamp-3">
+                    {project.shortDescription || project.description}
                   </p>
                   <div className="flex flex-wrap gap-2 mb-8">
                     {project.tags.map(tag => (
@@ -675,19 +780,12 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <a 
-                    href={project.demo} 
-                    className="flex-1 py-2.5 rounded-xl glass-hover bg-white/5 text-center text-xs font-semibold flex items-center justify-center gap-2"
-                  >
-                    <ExternalLink size={14} /> Live Demo
-                  </a>
-                  <a 
-                    href={project.github} 
-                    className="p-2.5 rounded-xl glass-hover bg-white/5"
-                    aria-label="GitHub Repository"
-                  >
-                    <Github size={16} />
-                  </a>
+                  <div className="flex-1 py-2.5 rounded-xl glass-hover bg-white/5 text-center text-xs font-semibold flex items-center justify-center gap-2">
+                    View Details
+                  </div>
+                  <div className="p-2.5 rounded-xl glass-hover bg-white/5">
+                    <ChevronRight size={16} />
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -761,7 +859,172 @@ export default function App() {
         </motion.div>
       </section>
 
-      {/* FOOTER */}
+      {/* PROJECT DETAILS MODAL */}
+      <AnimatePresence>
+        {selectedProject && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-12">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setSelectedProject(null); setIsEditing(false); }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, y: 100, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 100, scale: 0.9 }}
+              className="relative w-full max-w-5xl h-full max-h-[85vh] glass bg-linear-to-br from-white/10 to-white/5 rounded-[40px] overflow-hidden flex flex-col"
+            >
+              <div className="p-8 border-b border-white/5 flex items-center justify-between bg-black/20 shrink-0">
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => { setSelectedProject(null); setIsEditing(false); }}
+                    className="p-3 rounded-2xl glass glass-hover text-gray-400"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <h2 className="text-2xl font-bold tracking-tight">Project Details</h2>
+                </div>
+                <div className="flex items-center gap-3">
+                  {user?.email === PERSONAL_EMAIL && (
+                    <button 
+                      onClick={() => isEditing ? saveProject() : startEditing(selectedProject)}
+                      className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all ${
+                        isEditing ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'glass glass-hover text-blue-400'
+                      }`}
+                    >
+                      {isEditing ? <><Save size={16} /> Save Changes</> : <><Edit2 size={16} /> Edit Info</>}
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => { setSelectedProject(null); setIsEditing(false); }}
+                    className="p-3 rounded-2xl glass glass-hover text-gray-500"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 md:p-12 custom-scrollbar">
+                {isEditing ? (
+                  <div className="space-y-8 max-w-3xl mx-auto">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Project Title</label>
+                      <input 
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        className="w-full text-3xl font-bold bg-white/5 border border-white/10 rounded-2xl p-4 focus:border-blue-500 outline-hidden"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Short Summary</label>
+                      <input 
+                        value={editShortDesc}
+                        onChange={(e) => setEditShortDesc(e.target.value)}
+                        className="w-full text-lg bg-white/5 border border-white/10 rounded-2xl p-4 focus:border-blue-500 outline-hidden"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Full Description</label>
+                      <textarea 
+                        rows={8}
+                        value={editLongDesc}
+                        onChange={(e) => setEditLongDesc(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 focus:border-blue-500 outline-hidden leading-relaxed"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Tags (comma separated)</label>
+                        <input 
+                          value={editTags}
+                          onChange={(e) => setEditTags(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 focus:border-blue-500 outline-hidden"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">External Links</label>
+                        <div className="flex flex-col gap-2">
+                          <input 
+                            placeholder="GitHub URL"
+                            value={editGithub}
+                            onChange={(e) => setEditGithub(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs focus:border-blue-500 outline-hidden"
+                          />
+                          <input 
+                            placeholder="Demo URL"
+                            value={editDemo}
+                            onChange={(e) => setEditDemo(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs focus:border-blue-500 outline-hidden"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="max-w-4xl mx-auto">
+                    <div className="flex flex-col md:flex-row gap-12">
+                      <div className="flex-1">
+                        <div className="flex flex-wrap gap-2 mb-6">
+                          {selectedProject.tags.map(tag => (
+                            <span key={tag} className="px-3 py-1.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase tracking-widest">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                        <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">{selectedProject.title}</h1>
+                        <p className="text-xl text-gray-400 leading-relaxed font-light mb-8 italic">
+                          {selectedProject.shortDescription}
+                        </p>
+                        <div className="prose prose-invert max-w-none">
+                          <p className="text-gray-300 text-lg leading-loose whitespace-pre-wrap">
+                            {selectedProject.description}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="w-full md:w-80 shrink-0">
+                        <div className="sticky top-0 space-y-6">
+                          <div className="p-8 glass rounded-[32px] bg-white/5">
+                            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-6">Project Assets</h4>
+                            <div className="space-y-3">
+                              <a 
+                                href={selectedProject.demo} 
+                                target="_blank"
+                                rel="no-referrer"
+                                className="w-full py-4 rounded-2xl bg-white text-black font-bold flex items-center justify-center gap-3 hover:bg-gray-200 transition-all"
+                              >
+                                <ExternalLink size={18} /> Live Demo
+                              </a>
+                              <a 
+                                href={selectedProject.github} 
+                                target="_blank"
+                                rel="no-referrer"
+                                className="w-full py-4 rounded-2xl glass glass-hover font-bold flex items-center justify-center gap-3 transition-all"
+                              >
+                                <Github size={18} /> Source Code
+                              </a>
+                            </div>
+                          </div>
+                          
+                          <div className="p-6 glass rounded-[24px] bg-blue-500/5 border-blue-500/10">
+                            <p className="text-xs text-gray-400 leading-relaxed">
+                              Last updated on: <br />
+                              <span className="text-blue-400 font-mono">
+                                {selectedProject.updatedAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       <footer className="py-12 border-t border-white/5 text-center text-gray-600 text-sm">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="font-medium text-gray-400">© 2026 Ayush Kumar. All rights reserved.</div>
